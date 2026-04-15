@@ -1007,9 +1007,9 @@
           <button class="tab tutorialTab" id="tab-tutorial" type="button">Tutorial</button>
           <a class="tab" href="#home" id="tab-home">Home</a>
           <a class="tab" href="#schedule" id="tab-schedule">Schedule</a>
-          <a class="tab" href="#students" id="tab-students">Students &amp; Instruments</a>
+          <a class="tab" href="#students" id="tab-students">Students</a>
           <a class="tab" href="#fees" id="tab-fees">Payment history</a>
-          <a class="tab" href="#rates" id="tab-rates">Rates</a>
+          <a class="tab" href="#rates" id="tab-rates">Rates &amp; Instruments</a>
           <a class="tab" href="#analytics" id="tab-analytics">Analytics</a>
         </nav>
         <div class="userMenu" id="userMenu">
@@ -1040,7 +1040,7 @@
                 <div class="accBody">
                   <div class="list listCompact" id="overdueList"></div>
                   <div class="btnRow" style="margin-top:10px">
-                    <button class="btn btnSmall" id="openStudentsFromSide" type="button">Open students &amp; instruments</button>
+                    <button class="btn btnSmall" id="openStudentsFromSide" type="button">Open students</button>
                   </div>
                 </div>
               </details>
@@ -1210,8 +1210,8 @@
         instruments: ["Violin", "Theory"],
         rates: [
           { id: "rate_violin_30", instrument: "Violin", durationMin: 30, rate: 90 },
-          { id: "rate_violin_45", instrument: "Violin", durationMin: 45, rate: 135 },
-          { id: "rate_violin_60", instrument: "Violin", durationMin: 60, rate: 180 },
+          { id: "rate_violin_45", instrument: "Violin", durationMin: 45, rate: 120 },
+          { id: "rate_violin_60", instrument: "Violin", durationMin: 60, rate: 150 },
           { id: "rate_theory_60", instrument: "Theory", durationMin: 60, rate: 40 }
         ],
         students: [
@@ -1280,6 +1280,20 @@
           r.durationMin = Math.trunc(Number(r.durationMin || 0));
           r.rate = Number(r.rate || 0);
           if (!r.id) r.id = uid("rate");
+          if (
+            r.id === "rate_violin_45" &&
+            r.instrument === "Violin" &&
+            r.durationMin === 45 &&
+            (r.rate === 135 || r.rate === 0)
+          )
+            r.rate = 120;
+          if (
+            r.id === "rate_violin_60" &&
+            r.instrument === "Violin" &&
+            r.durationMin === 60 &&
+            (r.rate === 180 || r.rate === 0)
+          )
+            r.rate = 150;
         }
 
         for (const d of DEFAULT_DATA.rates) {
@@ -1795,7 +1809,7 @@
           {
             route: "home",
             target: "#tab-rates",
-            text: "Click “Rates” to customise your instruments and lesson prices.",
+            text: "Click “Rates & Instruments” to customise your instruments and lesson prices.",
             figure: 3,
             padPx: 6,
             advanceCheck: async () => {
@@ -1815,7 +1829,7 @@
           {
             route: "rates",
             target: "#tab-students",
-            text: "Now click “Students & Instruments” to manage your student list and instruments.",
+            text: "Now click “Students” to manage your student list.",
             figure: 3,
             padPx: 6,
             advanceCheck: async () => {
@@ -2203,9 +2217,19 @@
       }
 
       function instrumentIcon(instrument) {
-        if (instrument === "Violin") return "🎻";
-        if (instrument === "Theory") return "📘";
+        const inst = normInstrumentName(instrument);
+        const lower = inst.toLowerCase();
+        if (lower === "violin") return "🎻";
+        if (lower === "theory") return "📘";
+        if (lower === "piano" || lower.includes("piano")) return "🎹";
+        if (lower.includes("voice") || lower.includes("singing") || lower.includes("vocal")) return "🎤";
         return "";
+      }
+
+      function instrumentLabel(instrument) {
+        const inst = normInstrumentName(instrument);
+        const icon = instrumentIcon(inst);
+        return (icon ? icon + " " : "") + inst;
       }
 
       function getPaymentStatus(student) {
@@ -3091,10 +3115,13 @@
         });
 
         const instFilter = buildSelect(
-          [{ value: "All", label: "All instruments" }, ...getInstrumentList().map((x) => ({ value: x, label: x }))],
+          [{ value: "All", label: "All instruments" }, ...getInstrumentList().map((x) => ({ value: x, label: instrumentLabel(x) }))],
           state.ui.studentInstrument || "All"
         );
-        const instFilterOptions = [{ value: "All", label: "All instruments" }, ...getInstrumentList().map((x) => ({ value: x, label: x }))];
+        const instFilterOptions = [
+          { value: "All", label: "All instruments" },
+          ...getInstrumentList().map((x) => ({ value: x, label: instrumentLabel(x) }))
+        ];
         if (!instFilterOptions.some((o) => String(o.value) === String(state.ui.studentInstrument || "All"))) {
           state.ui.studentInstrument = "All";
           instFilter.value = "All";
@@ -3110,62 +3137,9 @@
           render();
         });
 
-        const { wrap } = pageShell("Students & Instruments", [search, instFilter, overdueBtn, addBtn]);
+        const { wrap } = pageShell("Students", [search, instFilter, overdueBtn, addBtn]);
         const body = document.createElement("div");
         body.className = "stack";
-
-        const instPanel = document.createElement("div");
-        instPanel.className = "panel";
-        const instInner = document.createElement("div");
-        instInner.className = "panelInner";
-        instInner.innerHTML =
-          "<div class='panelTitle'><h2>Instruments</h2><span class='pill'>Editable</span></div>" +
-          "<div class='help' style='margin-top:6px'>Rename or delete custom instruments here. Default instruments are locked.</div>" +
-          "<div class='list' style='margin-top:10px'></div>";
-        const instList = instInner.querySelector(".list");
-        const custom = getInstrumentList().filter((x) => !DEFAULT_INSTRUMENTS.includes(x));
-        if (custom.length === 0) {
-          const empty = document.createElement("div");
-          empty.className = "muted";
-          empty.textContent = "No custom instruments yet.";
-          instList.appendChild(empty);
-        } else {
-          for (const instName of custom) {
-            const item = document.createElement("div");
-            item.className = "listItem";
-            const row = document.createElement("div");
-            row.className = "fieldRow";
-            row.style.gridTemplateColumns = "minmax(0, 1fr) auto auto";
-            row.style.alignItems = "end";
-
-            const field = document.createElement("div");
-            field.className = "field";
-            field.innerHTML = "<div class='label'>Instrument name</div>";
-            const input = document.createElement("input");
-            input.type = "text";
-            input.value = instName;
-            field.appendChild(input);
-
-            const saveBtn = buildButton("Save", "btnSmall btnPrimary", () => {
-              const ok = renameInstrument(instName, input.value);
-              if (!ok) alert("Could not rename instrument. Make sure the name is unique and not a default instrument.");
-            });
-            const delBtn = buildButton("Delete", "btnSmall btnDanger", () => {
-              const ok = confirm("Delete instrument “" + instName + "”? Students using it will be moved to " + (DEFAULT_INSTRUMENTS[0] || "Violin") + ".");
-              if (!ok) return;
-              const did = deleteInstrument(instName);
-              if (!did) alert("Could not delete instrument.");
-            });
-
-            row.appendChild(field);
-            row.appendChild(saveBtn);
-            row.appendChild(delBtn);
-            item.appendChild(row);
-            instList.appendChild(item);
-          }
-        }
-        instPanel.appendChild(instInner);
-        body.appendChild(instPanel);
 
         const tableWrap = document.createElement("div");
         tableWrap.className = "tableWrap";
@@ -3267,7 +3241,7 @@
 
           const instTd = document.createElement("td");
           const instSelect = buildSelect(
-            getInstrumentList().map((x) => ({ value: x, label: x })),
+            getInstrumentList().map((x) => ({ value: x, label: instrumentLabel(x) })),
             normInstrumentName(s.instrument)
           );
           instSelect.addEventListener("change", () => {
@@ -3768,7 +3742,7 @@
             meta.className = "lessonMeta";
             meta.textContent =
               "Makeup • " +
-              ev.instrument +
+              instrumentLabel(ev.instrument) +
               " • " +
               ev.durationMin +
               " min • " +
@@ -3791,7 +3765,7 @@
             if (cancelled) block.className += " lessonCancelled";
             const status = cancelled ? " • Cancelled" : att && att.status === "absent" ? " • Absent" : att ? " • Done" : "";
             meta.textContent =
-              ev.student.instrument +
+              instrumentLabel(ev.student.instrument) +
               " • " +
               ev.student.durationMin +
               " min • " +
@@ -3814,9 +3788,73 @@
       }
 
       function renderRatesPage() {
-        const { wrap } = pageShell("Rates", []);
+        const { wrap } = pageShell("Rates & Instruments", []);
         const body = document.createElement("div");
         body.className = "stack";
+
+        const instPanel = document.createElement("div");
+        instPanel.className = "panel";
+        const instInner = document.createElement("div");
+        instInner.className = "panelInner";
+        instInner.innerHTML =
+          "<div class='panelTitle'><h2>Instruments</h2><span class='pill'>Editable</span></div>" +
+          "<div class='help' style='margin-top:6px'>Rename or delete custom instruments here. Default instruments are locked.</div>" +
+          "<div class='list' style='margin-top:10px'></div>";
+        const instList = instInner.querySelector(".list");
+        const custom = getInstrumentList().filter((x) => !DEFAULT_INSTRUMENTS.includes(x));
+        if (custom.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "muted";
+          empty.textContent = "No custom instruments yet.";
+          instList.appendChild(empty);
+        } else {
+          for (const instName of custom) {
+            const item = document.createElement("div");
+            item.className = "listItem";
+            const row = document.createElement("div");
+            row.className = "fieldRow";
+            row.style.gridTemplateColumns = "minmax(0, 1fr) auto auto";
+            row.style.alignItems = "end";
+
+            const field = document.createElement("div");
+            field.className = "field";
+            field.innerHTML = "<div class='label'>Instrument name</div>";
+            const input = document.createElement("input");
+            input.type = "text";
+            input.value = instName;
+            field.appendChild(input);
+
+            const saveBtn = buildButton("Save", "btnSmall btnPrimary", () => {
+              const ok = renameInstrument(instName, input.value);
+              if (!ok) {
+                alert("Could not rename instrument. Make sure the name is unique and not a default instrument.");
+                return;
+              }
+              save();
+              render();
+            });
+            const delBtn = buildButton("Delete", "btnSmall btnDanger", () => {
+              const ok = confirm(
+                "Delete instrument “" + instName + "”? Students using it will be moved to " + (DEFAULT_INSTRUMENTS[0] || "Violin") + "."
+              );
+              if (!ok) return;
+              const did = deleteInstrument(instName);
+              if (!did) {
+                alert("Could not delete instrument.");
+                return;
+              }
+              save();
+              render();
+            });
+
+            row.appendChild(field);
+            row.appendChild(saveBtn);
+            row.appendChild(delBtn);
+            item.appendChild(row);
+            instList.appendChild(item);
+          }
+        }
+        instPanel.appendChild(instInner);
 
         const ratesPanel = document.createElement("div");
         ratesPanel.className = "panel";
@@ -3847,7 +3885,7 @@
           item.innerHTML =
             "<div class='listItemTop'><div class='strong'></div><div class='btnRow'></div></div>" +
             "<div class='stack' style='margin-top:10px'></div>";
-          item.querySelector(".strong").textContent = inst;
+          item.querySelector(".strong").textContent = instrumentLabel(inst);
           const row = item.querySelector(".btnRow");
           const addRateBtn = buildButton("Add rate", "btnSmall", () => {
             if (!Array.isArray(state.data.rates)) state.data.rates = [];
@@ -3929,6 +3967,7 @@
         }
 
         ratesPanel.appendChild(ratesInner);
+        body.appendChild(instPanel);
         body.appendChild(ratesPanel);
         wrap.appendChild(body);
         return wrap;
@@ -4122,7 +4161,7 @@
         mv[1].textContent = money(paidLifetime);
         mv[2].textContent = money(computeOutstandingAmount(s));
         mv[3].textContent = String(s.creditsRemaining);
-        mv[4].textContent = s.instrument + " • " + s.durationMin + " min • " + (rate ? money(rate) : "No rate");
+        mv[4].textContent = instrumentLabel(s.instrument) + " • " + s.durationMin + " min • " + (rate ? money(rate) : "No rate");
         mv[5].textContent = lessons.length ? lessons.map((l) => WEEK_DAYS[l.dayIndex] + " " + l.time).join(", ") : "—";
         overview.appendChild(oi);
         body.appendChild(overview);
@@ -4174,7 +4213,7 @@
             item.className = "listItem";
             item.innerHTML = "<div class='listItemTop'><div class='strong'></div><div class='btnRow'></div></div><div class='muted'></div>";
             item.querySelector(".strong").textContent = WEEK_DAYS[l.dayIndex] + " • " + l.time;
-            item.querySelector(".muted").textContent = s.instrument + " • " + s.durationMin + " min";
+            item.querySelector(".muted").textContent = instrumentLabel(s.instrument) + " • " + s.durationMin + " min";
             const row = item.querySelector(".btnRow");
             const open = buildButton("Open", "btnSmall", () => openLessonDrawer(l.id));
             row.appendChild(open);
@@ -4328,9 +4367,9 @@
         }
 
         grid.appendChild(card("Schedule", "Weekly timetable, go-to date, and attendance.", "#schedule", true));
-        grid.appendChild(card("Students & Instruments", "Registry, instruments, credits, lesson times, and quick actions.", "#students", false));
+        grid.appendChild(card("Students", "Registry, credits, lesson times, and quick actions.", "#students", false));
         grid.appendChild(card("Payment history", "Payments and repair fees.", "#fees", false));
-        grid.appendChild(card("Rates", "Add instruments and update prices by duration.", "#rates", false));
+        grid.appendChild(card("Rates & Instruments", "Add instruments and update prices by duration.", "#rates", false));
         grid.appendChild(card("Analytics", "Revenue charts and per-instrument breakdowns.", "#analytics", false));
         wrap.appendChild(grid);
 
@@ -4423,7 +4462,7 @@
         tag.className = "tag " + (status === "Overdue" ? "tagBad" : "tagGood");
         tag.textContent = status;
         summary.querySelector(".muted").textContent =
-          s.instrument + " • " + s.durationMin + " min • " + (rate ? money(rate) + " / lesson" : "No rate set");
+          instrumentLabel(s.instrument) + " • " + s.durationMin + " min • " + (rate ? money(rate) + " / lesson" : "No rate set");
 
         const actions = document.createElement("div");
         actions.className = "listItem";
@@ -4470,7 +4509,7 @@
               "<div class='muted'></div>" +
               "<div class='timeSliderWrap'></div>";
             li.querySelector(".strong").textContent = WEEK_DAYS[l.dayIndex];
-            li.querySelector(".muted").textContent = s.instrument + " • " + s.durationMin + " min";
+            li.querySelector(".muted").textContent = instrumentLabel(s.instrument) + " • " + s.durationMin + " min";
             const lr = li.querySelector(".btnRow");
             const open = buildButton("Open", "btnSmall", () => openLessonDrawer(l.id));
             lr.appendChild(open);
@@ -4584,7 +4623,7 @@
         const status = att && att.status === "cancelled" ? "Cancelled" : att && att.status === "absent" ? "Absent" : att ? "Done" : "Scheduled";
         details.querySelector(".tag").textContent = WEEK_DAYS[l.dayIndex] + " " + l.time + " • " + status;
         details.querySelector(".muted").textContent =
-          s.instrument + " • " + s.durationMin + " min • " + (rate ? money(rate) : "No rate set") + " • Credits: " + s.creditsRemaining;
+          instrumentLabel(s.instrument) + " • " + s.durationMin + " min • " + (rate ? money(rate) : "No rate set") + " • Credits: " + s.creditsRemaining;
 
         const actions = document.createElement("div");
         actions.className = "listItem";
