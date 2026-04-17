@@ -16,7 +16,7 @@ This is a website that helps students track their fees.
 
 
 
-\## How to use
+\ How to use
 
 Open the website and enter your data.
 
