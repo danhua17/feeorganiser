@@ -1,6 +1,4 @@
-"THEfeeorganiser"
-
-\# Fee Organiser
+\ Fee Organiser
 
 
 
@@ -8,7 +6,7 @@ This is a website that helps students track their fees.
 
 
 
-\## Features
+\ Features
 
 \- Add students
 
